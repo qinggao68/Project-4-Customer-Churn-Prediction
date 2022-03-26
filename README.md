@@ -8,6 +8,7 @@ This analysis is studied upon a bank data set provided on the UCI datasets repos
 - based on the correlation matrix, we can see that predictors Age & Balance are mostly correlated with response variable - Exited, EstimatedSalary has almost no correlation, and CreditScore, Tenure, NumOfProducts, HasCrCard, and IsActiveMember moved in the opposite direction
 ![correlation matrix](https://github.com/qinggao68/Project-4-Customer-Churn-Prediction/blob/main/correlation_matrix.PNG)
 - the top predictors that are most statistically signicant considered by all 6 models are: Germany, Male, Age, Balance, IsActiveMember, CreditScore, and NumOfProducts
+
 ![predictors selected by stepwise](https://github.com/qinggao68/Project-4-Customer-Churn-Prediction/blob/main/stepwise_significant_pred.PNG)
 ![predictors selected by rf](https://github.com/qinggao68/Project-4-Customer-Churn-Prediction/blob/main/important_predictors_selected_rf.PNG)
 
