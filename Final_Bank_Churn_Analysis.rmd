@@ -514,7 +514,7 @@ ggplotly(p6)
 
 ## 2.7 Numerical Variables
 
-### 2.7.1 Distribution Between All Numerical Variables vs Customers Status
+### 2.7.1 Distribution Between NumOfProducts vs Customers Status
 
 ```{r}
 # Create a density plot to view the distribution between Credit Score vs customers status
@@ -622,7 +622,7 @@ churn_model <- churn_df
 
 ```{r}
 # Create dummy variables for Geography
-churn_model1 <- dummy_cols(churn_model, select_columns = "Geography") %>%
+churn_model1 <- dummy_cols(churn_df, select_columns = "Geography") %>%
   dplyr::select(-Geography_France) %>%
   rename(Germany = Geography_Germany) %>%
   rename(Spain = Geography_Spain)
@@ -1094,7 +1094,7 @@ metrics
 
 **Summary:**
 
--   the top 6 predictors that random forest selected are the same as the previous models we have seen so far
+-   the top 6 predictors that random forest selected are the similar as the previous models we have seen so far
 
 -   based on the confusion matrix: 
 
