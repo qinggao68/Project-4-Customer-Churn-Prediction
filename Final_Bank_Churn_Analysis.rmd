@@ -1,0 +1,1167 @@
+---
+title: "Customer Churn"
+author: "Christina Gao"
+date: "2/8/2022"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Bank Churn
+
+# 1. Data Preparation
+
+## 1.1 Load Packages
+
+```{r}
+# Load packages 
+
+# Data Preparation
+library(dplyr)  #data manipulation
+library(readr)    # read rectangular data like csv, tsv
+library(skimr) # provide broad overview of dataframe
+library(tidyr)  # tidy messy data 
+library(tidyverse)
+
+
+# Data Visualization 
+library(ggplot2) # visualization usage
+library(plotly)  # produce interactive plots 
+library(ggcorrplot) # create corrlation matrix using ggplot2
+library(ggpubr)  # easier to use functions working with ggplot2
+library(cowplot) # add on to ggplot
+library(gridExtra) # arrange multiple grid-based plots on a page 
+library(corrplot) # create correlation plot 
+library(naniar) # display #s of missing values visually
+library(ggridges) # 
+library(ggsci)  # collection of ggplot2 color palettes
+library(forcats) # use it for plotting a factor
+library(ggalluvial) # position into an strate of an alluvial plot 
+library(hrbrthemes)  # a precise & pristine theme
+library(graphics)  # adds 1+ straight lines through the plot
+theme_set(theme_bw()) # twerk existing themes
+
+# Data Wrangling
+library(caret)  # sampling methods for treatment of imbalanced data
+library(ROSE) # access to down, over, and both sampling methods
+library(performanceEstimation) # smote sampling
+library(fastDummies) # create dummy variables faster
+
+# Features Selection
+library(caret)  # classification and regression training
+library(leaps)  # perform extensive search to find best subsets of variables
+library(glmnet) # access to lasso & EN models
+
+# ML Models
+library(caTools) # split data, calculate & plot AUC
+library(cvms)  # plotting confusion matrix
+library(ROCR) # access to the prediction func
+library(MASS) # for modern applied stats with S 
+library(car)  # use for VIF
+library(randomForest)  # random forest algorithm
+library(rpart)  # for CART
+library(rpart.plot) # to create the CART plot
+library(InformationValue)  # compute the opt. probability cutoff for log. reg. 
+library(pROC) # to calculate the ROC curve
+library(vip)  # to view the importance of predictors
+```
+
+## 1.2 Clear Global Environment & Set Seed
+
+```{r}
+# Clear the global env variables
+rm(list=ls())
+
+# Set seed so code can be reproduced
+set.seed(2021)
+```
+
+## 1.3 Load Files
+
+```{r}
+# load bank churn data set 
+churn_data <- read.csv("Bank_Churn.csv", header = TRUE, stringsAsFactors = TRUE)
+
+# View the first 10 observations
+head(churn_data, n = 10)
+# Take a look at the structure of the train data set
+skim(churn_data)
+```
+
+**Summary:** In this data set, there are 14 predictors, 11 of them are numeric type and 3 of them are factors type.
+A brief description of each predictor:
+
+-   **RowNumber:** corresponds to the record number
+-   **CustomerId:** identification of current & past customers
+-   **Surname:** the surname of current & past customers
+-   **CreditScore:** credit score of current & past customers
+-   **Geography:** current & past customers' location at bank; has three levels - France, Spain, Germany
+-   **Gender:** has two levels - female or male
+-   **Age:** age of current & past customers at the bank
+-   **Tenure:** refers to the numbers of years the current & past customers have been a client at the bank
+-   **Balance:** current & past customers' balances at the bank
+-   **NumOfProducts:** the numbers of products a customer has purchased throughout the bank
+-   **HasCrCard:** indicator of whether a customer has a credit card; 1 indicate yes, 0 indicate no
+-   **IsActiveMember:** indicator of whether if a customer is active or not; 1 indicate active, 0 indicate not active
+-   **EstimatedSalary:** current & past customers' balance at the bank
+-   **Exited:** churn customer or not, has two levels - 1 indicate churn, 0 indicate not churn
+
+## 1.4 Missing Values
+
+```{r}
+# Check to see if there are any missing values 
+colSums(is.na(churn_data))
+```
+
+## 1.5 Remove Unnecessary Columns
+
+```{r}
+# Drop RowNumber, CustomerId, and Surname
+churn_df <- churn_data %>%
+  dplyr::select(-c("RowNumber", "CustomerId", "Surname"))  # to indicate we are grabbing select() from dplyr package
+
+# View the top 10 observations of modified df 
+head(churn_df, n = 10)
+```
+
+**Summary:**
+
+-   dropped columns - RowNumber, CustomerId, and Surname because they won't be impacting the response variable - Exited
+
+# 2. Data Visualization
+
+```{r}
+# Create a new df for visualization only
+churn_vis <- churn_df
+```
+
+## 2.1 Binning Selected Features - FICO Score
+
+```{r}
+# View the range of credit score 
+summary(churn_vis$CreditScore)
+
+# Group credit score from Poor to Excellent
+credit_score <- function(CreditScore){
+      if(CreditScore >= 300 & CreditScore <= 579){
+            return("Poor")
+      }else if(CreditScore > 579 & CreditScore <= 669){
+            return("Fair")
+      }else if(CreditScore > 669 & CreditScore <= 739){
+            return("Good")
+      }else if(CreditScore > 739 & CreditScore <= 799){
+            return("Very Good")
+      }else if(CreditScore > 799){
+            return("Excellent")
+      }
+}
+
+# Use sapply() function to retrieve an output in vector
+churn_vis$FICOScore <- sapply(churn_vis$CreditScore, credit_score)
+# Turn FICOScore into a factor
+churn_vis$FICOScore <- as.factor(churn_vis$FICOScore)
+head(churn_vis)
+```
+
+**Summary:**
+
+-   assign 5 levels to CreditScore that corresponds to the FICO credit score
+
+## 2.2 Binning Selected Features - Tenure
+
+```{r}
+# View the range of tenure
+summary(churn_vis$Tenure)
+
+# Group tenure from 0 year to 10 years
+tenure <- function(Tenure){
+      if(Tenure >= 0 & Tenure <= 3){
+            return("0 - 36 Months")
+      }else if(Tenure > 3 & Tenure <= 5){
+            return("36 - 60 Months")
+      }else if(Tenure > 5 & Tenure <= 7){
+            return("60 - 84 Months")
+      }else if(Tenure > 7 & Tenure <= 10){
+            return("84 - 120 Months")
+      }
+}
+  
+# Use sapply() function to retrieve an output in vector
+churn_vis$tenure <- sapply(churn_vis$Tenure, tenure)
+# Turn tenure into a factor
+churn_vis$tenure <- as.factor(churn_vis$tenure)
+head(churn_vis)
+```
+
+**Summary:**
+
+-   assigns 4 levels to tenure, it ranges from 0 to 120 months to represent the tenure of 0 to 10 years
+
+## 2.3 Binning Selected Features - Estimated Salary
+
+```{r}
+# View the range of tenure
+summary(churn_vis$EstimatedSalary)
+
+# Group Estimated Salary from 11.58 to 199992.48 
+salary <- function(Tenure){
+      if(Tenure >= 11.58 & Tenure <= 51002.11){
+            return("Less than $51K")
+      }else if(Tenure > 51002.11 & Tenure <= 100193.91 ){
+            return("$51k - $100k")
+      }else if(Tenure > 100193.91 & Tenure <= 149388.25 ){
+            return("$100k - $149k")
+      }else if(Tenure > 149388.25 & Tenure <= 199992.48){
+            return("$149k - $200k")
+      }
+}
+
+# Use sapply() function to retrieve an output in vector
+churn_vis$salary <- sapply(churn_vis$EstimatedSalary, salary)
+# Turn salary into a factor
+churn_vis$salary <- as.factor(churn_vis$salary)
+head(churn_vis)
+```
+
+**Summary:**
+
+-   assigns 4 levels to EstimatedSalary, it ranges from 11.58 to 199,992.48
+
+## 2.4 Binning Selected Feature - Age
+
+```{r}
+# View the range of tenure
+summary(churn_vis$Age)
+
+# Group Estimated Salary from 11.58 to 199992.48 
+age_grp <- function(Age){
+      if(Age <= 18){
+            return("Young")
+      }else if(Age > 18 & Age <= 44 ){
+            return("Middle-Aged")
+      }else if(Age > 44 & Age <= 92 ){
+            return("Old")
+      }
+}
+
+# Use sapply() function to retrieve an output in vector
+churn_vis$age_grp <- sapply(churn_vis$Age, age_grp)
+# Turn salary into a factor
+churn_vis$age_grp <- as.factor(churn_vis$age_grp)
+head(churn_vis)
+```
+
+**Summary:**
+
+-   assigns 3 levels to Age, it ranges from 18 years old to 92 years old
+
+## 2.5 Recode Exited Column
+
+```{r}
+# Code (1) as Not Customer, (0) as Still Customer
+cust_status <- function(Exited){
+      if(Exited >= 1 ){
+            return("Not Customer")
+      }else if(Exited <= 0){
+            return("Still Customer")
+      }
+}
+
+# Use sapply() function to retrieve an output in vector
+churn_vis$cust_status <- sapply(churn_vis$Exited, cust_status)
+# Turn exited_cust into a factor
+churn_vis$cust_status <- as.factor(churn_vis$cust_status)
+head(churn_vis)
+```
+
+**Summary:**
+
+-   created a column named cust_status to represent the response variable - Exited by creating "not customers" to represent 1, and "still customers" to represent 0
+
+## 2.6 Categorical Variables
+
+### 2.6.1 Comparison Between CreditScore vs Customers Status
+
+```{r}
+# Create a bar graph to view the comparison between Credit Score vs customers status
+p1 <- churn_vis %>% 
+  ggplot(aes(x = cust_status,fill = FICOScore)) +
+geom_bar(position ="dodge") +
+geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,1), '%')),
+          stat = 'count',
+          position = position_dodge(0.9), # move to center of bars
+          size = 4,
+         vjust = -0.5) + # nudge above top of bar
+labs(title = "FICO Score vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to the Percentage of each FICO Categories",
+    x = "Churn_Flag",y ="Count")  
+ggplotly(p1)
+
+# grid.arrange(p1, p2, p3, nrow = 3)
+```
+
+**Summary:**
+
+-   most customers that are still at the bank have a FICO score of "Fair" which accounts for 26.5%
+-   some customers that are still at the bank have a FICO score of "Poor"
+-   most customers that are no longer at the bank have a FICO score of "Fair" which accounts for 6.9%\
+-   some customers that are no longer at the bank have a FICO score of "Excellent" which accounts for 1.3%
+
+### 2.6.2 Comparison Between Gender vs Customers Status
+
+```{r}
+# Create a bar graph to view the comparison between gender vs customers status
+p2 <- churn_vis %>% 
+  ggplot(aes(x = cust_status,fill=Gender)) +
+geom_bar(position="dodge") +
+geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 5,
+         vjust=-1)+
+labs(title="Gender vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Gender",
+    x="Churn_Flag",y="Count")
+ggplotly(p2)
+```
+
+**Summary:**
+
+-   more **male** customers are still a customer at the bank than female customers
+-   more **female** customers are no longer a customer at the bank
+
+### 2.6.3 Comparison Between Salary vs Customers Status
+
+```{r}
+# Create a bar graph to view the comparison between salary vs customers status
+p3 <- churn_vis %>%
+  ggplot(aes(x = cust_status,fill = salary)) +
+geom_bar(position="dodge") +
+geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(width = .9), # move to center of bars
+          size = 4,
+         vjust = -0.5) + # nudge above top of bar
+labs(title = "Estimated Salary vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Gender",
+    x ="Churn_Flag",y="Count")
+
+ggplotly(p3)
+```
+
+**Summary:**
+
+-   the estimated salary range for customers that are still a customer vs no longer a customer have relatively the same distribution
+
+### 2.6.4 Salary vs Credit Score vs Customers' Status
+
+```{r}
+# Create a function to control the number of dec. digits printed in output
+specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
+
+# Compare customers' status by salary & credit score 
+salary_creditscore_cust <- churn_vis %>% 
+  count(cust_status, salary, FICOScore) %>% 
+  group_by(cust_status, salary, FICOScore) %>% 
+  summarise(total = sum(n)) %>% 
+  ungroup() %>% 
+  group_by(salary) %>% 
+  mutate(pct = total / sum(total)) %>%
+  ungroup() %>%
+  # arrange(desc(total)) %>%
+  mutate(salary = salary %>% factor(levels = c("Less than $51K", "$51k - $100k", "$100k - $149k", "$149k - $200k")) %>%
+  fct_rev()) %>%
+  mutate(
+    pct = as.numeric(specify_decimal(pct,4)),
+    pct_txt = str_glue("{pct*100}%")
+  )
+salary_creditscore_cust
+
+# Create a heatmap 
+
+salary_creditscore_cust %>% 
+  ggplot(aes(x = FICOScore, y = salary)) + 
+  geom_tile(aes(fill = pct)) + scale_fill_gradient2(low = "#6F99ADFF", mid = "white", high = "#BC3C29FF") + facet_wrap(~ cust_status, scales = "free_x") + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.caption = element_text(face = "italic")) + 
+  geom_text(aes(label = pct_txt), size = 3) + 
+  labs(
+    title = "Heatmap - Salary vs Credit Score vs Customers Status",
+    x = "Credit Score", 
+    y = "Salary"
+  )
+```
+
+**Summary:**
+
+-   at all estimated salary ranges, all customers that are still a client at the bank have a "Fair" FICO score; this is the same as customers that are no longer a client at the bank
+
+### 2.6.5 Salary vs Exited
+
+```{r}
+# # Find % of customers who left 
+exited_cust <- churn_vis %>%
+  dplyr::select(cust_status, salary) %>%
+  count(cust_status, salary) %>%
+  group_by(salary) %>%
+  mutate(percentage = n/sum(n)) %>%
+  ungroup %>%
+  arrange(desc(percentage)) %>%
+  mutate(
+    pct_text = scales::percent(percentage),
+    salary= salary %>% factor(levels = c("Less than $51K", "$51k - $100k", "$100k - $149k", "$149k - $200k")) %>% fct_rev(),
+    salary = salary %>% as_factor() %>% fct_reorder(percentage),
+    cust_status = cust_status %>% as_factor() %>% fct_rev()
+  )
+exited_cust
+# Plot out Salary vs Customer Status
+exited_cust %>%
+  ggplot(aes(x = salary, y = percentage, color= cust_status)) +
+  geom_segment(aes(yend = 0, xend = salary), size = 1) +
+  geom_point() + geom_label(aes(label = pct_text), hjust = "inward",
+                            size = 3) + coord_flip() +
+  facet_wrap(~ cust_status) +
+  theme(legend.position = "none") +
+  labs(
+    title = "Salary vs Customers Status",
+    x = "Salary Category",
+    y = "Percentage of Churn"
+  )
+
+```
+
+### 2.6.6 Comparison Between Age vs Customers Status
+
+```{r}
+# Create a bar graph to view the relationship between Age vs customers status
+p4 <- churn_vis %>% 
+  ggplot(aes(x=cust_status,fill=age_grp)) +
+  geom_bar(position="dodge") +
+  geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 5,
+         vjust=-1)+
+  labs(title="Age vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Age",
+    x="Churn_Flag",y="Count")
+ggplotly(p4)
+```
+
+**Summary:**
+
+-   most customers that are still a customer at the bank are **middle-aged**
+-   most customers that are no longer a customer at the bank are **old**
+-   **young** customers for both customers' status is the same
+-   accounts for 0.2%
+
+### 2.6.7 Comparison Between Tenure vs Customers Status
+
+```{r}
+# Create a bar graph to view the relationship between Tenure vs customers status
+p5 <- churn_vis %>% 
+  ggplot(aes(x = cust_status, fill = tenure)) +
+  geom_bar(position="dodge") +
+  geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 4,
+         vjust = -1)+
+  labs(title="Tenure vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Tenure",
+    x ="Churn_Flag",y ="Count")
+ggplotly(p5)
+
+# grid.arrange(p3, p4, nrow = 2)
+```
+
+**Summary:**
+
+-   most customers that are still a customer at the bank have a tenure of **0-36 months**
+-   most customers that are no longer a customer at the bank have a tenure of **0-36 months** as well
+-   there are more customers that have a tenure of **84-120 months** are still a customer at the bank as compared to customers who are no longer a customer that also has stayed at the bank for 84-120 months
+
+### 2.6.8 Comparison Between Geography vs Customers Status
+
+```{r}
+# Create a bar graph to view the relationship between Geography vs customers status
+p6 <- churn_vis %>% 
+  ggplot(aes(x = cust_status, fill = Geography)) +
+  geom_bar(position="dodge") +
+  geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100, 2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 5,
+         vjust = -1)+
+  labs(title ="Geography vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Geography",
+    x ="Churn_Flag",y="Count")
+ggplotly(p6)
+```
+
+**Summary:**
+
+-   most customers that are still a customer at the bank are located in **France** which accounts for 42.04%
+-   most customers that are no longer a customer at the bank are located in **Germany** which accounts for 8.14%
+
+## 2.7 Numerical Variables
+
+### 2.7.1 Distribution Between All Numerical Variables vs Customers Status
+
+```{r}
+# Create a density plot to view the distribution between Credit Score vs customers status
+p7 <- churn_vis %>%
+  ggplot(aes(x = NumOfProducts, fill = cust_status)) +
+  geom_density(alpha = 0.8) +
+  labs(title ='Numbers of Bank Products vs Customers Status' )
+
+ggplotly(p7)
+```
+
+**Summary:**
+
+-   most customers that are still a customer at the bank have **2 products**
+-   most customers that are no longer a customer at the bank have only **1 product**
+-   there are some customers that are no longer a customer at the bank who have 3 or 4 products, while customers that are still a customer at the bank have only 1 to 2 products
+
+### 2.7.2 Comparison Between IsActiveMember vs Customers Status
+
+```{r}
+# Turn numerical IsActiveMember into categorical variable
+active_mem <- ifelse(churn_vis$IsActiveMember == "1", "yes", "no")
+
+# Create a bar plot to view the comparison between IsActiveMember vs customers status
+p8 <- churn_vis %>% 
+  ggplot(aes(x = cust_status,fill = active_mem)) +
+  geom_bar(position="dodge") +
+  geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 5,
+         vjust = -1)+
+  labs(title ="IsActiveMember vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to Active Member",
+    x ="Churn_Flag",y="Count")
+
+ggplotly(p8)
+```
+
+**Summary:**
+
+-   most customers that are still a customer at the bank are **44.16%** more **Active Member** than 35.47%, not active member
+-   most customers that are no longer a customer at the bank are more **not active member** vs active member
+
+### 2.7.3 Comparison Between HasCreditCard vs Customers Status
+
+```{r}
+# Turn numerical HasCreditCard into categorical variable
+has_credit_card <- ifelse(churn_vis$HasCrCard == "1", "yes", "no")
+
+# Create a bar plot to view the comparison between HasCreditCard vs customers status
+p9 <- churn_vis %>% 
+  ggplot(aes(x = cust_status,fill = has_credit_card)) +
+  geom_bar(position ="dodge") +
+  geom_text(aes(y = (..count..)/sum(..count..),
+              label = paste0(round(prop.table(..count..) * 100,2), '%')),
+          stat = 'count',
+          position = position_dodge(0.9),
+          size = 5,
+         vjust = -1)+
+  labs(title ="HasCreditCard vs Customers Status",
+     subtitle = "Percentages of Churn-Flag Relative to HasCreditCard",
+    x ="Churn_Flag",y ="Count")
+
+ggplotly(p9)
+
+
+# Put all graphs into 1 page 
+# grid.arrange(p6, p7, p8, nrow = 3)
+```
+
+**Summary:**
+
+-   **56.31%** of customers at the bank has a credit card as compared to **23.32%** of customers that do not have a credit card
+-   **14.24%** of customers that are no longer at the bank had a credit card as compared to **6.13%** of customers that do not have a credit card
+
+### 2.7.4 Correlation Matrix
+
+```{r}
+# Drop gender & geography as factors cant be calculated to get its correlation
+corr_matrix <- churn_df %>%
+  dplyr:: select(-c("Gender", "Geography"))
+
+
+# # Create a correlation matrix
+corr <- round(cor(corr_matrix), 3)
+corrplot(corr, method = "color", cl.pos = 'n', rect.col = "black",  tl.col = "indianred4", addCoef.col = "black", number.digits = 2, number.cex = 0.60, tl.cex = 0.7, cl.cex = 1, col = colorRampPalette(c("green4","white","red"))(100))
+```
+
+**Summary:**
+
+-   **Age & Balance** are most correlated with the response variable - Exited
+-   **EstimatedSalary** has almost no correlation with the response variable - Exited
+-   **CreditScore, Tenure, NumOfProducts, HasCrCard, and IsActiveMember** have negative correlation with the response variable - Exited
+
+# 3. Data Wrangling
+
+```{r}
+# Create a new df specifically for machine learning 
+churn_model <- churn_df
+```
+
+## 3.1 Dummy Variables
+
+```{r}
+# Create dummy variables for Geography
+churn_model1 <- dummy_cols(churn_model, select_columns = "Geography") %>%
+  dplyr::select(-Geography_France) %>%
+  rename(Germany = Geography_Germany) %>%
+  rename(Spain = Geography_Spain)
+#
+#
+# # Create dummy variables for Gender
+churn_model <- dummy_cols(churn_model1, select_columns = "Gender") %>%
+  dplyr::select(-Gender_Female) %>%
+  rename(Male = Gender_Male)
+#
+head(churn_model)
+```
+
+**Summary:**
+
+-   used the k-1 rule of thumb, created 2 dummy variables for the explanatory variables\
+-   1 dummy variable for geography and 1 dummy variable for gender
+-   France is the base for geography, 1 represent Germany, 0 otherwise, the same applies to Spain
+-   Female is the base for Gender, 1 represent Male, 0 otherwise
+
+## 3.2 Re-organize the Data frame
+
+```{r}
+# Re-order the df to has the response variable - Exited at the very end 
+churn_model <- churn_model %>%
+  dplyr::select(CreditScore, Geography, Germany, Spain, Gender, Male, Age, Tenure, Balance, HasCrCard, IsActiveMember, Balance, NumOfProducts, HasCrCard, IsActiveMember, EstimatedSalary, Exited)
+head(churn_model)
+```
+
+## 3.3 Scale Numerical Variables
+
+```{r}
+# Turn response Exited into factor
+churn_model$Exited <- as.factor(churn_model$Exited)
+
+# Scale data set on explanatory variables only
+scale_model <- churn_model %>%
+               mutate_at(c("CreditScore", "Age", "Tenure", "Balance","NumOfProducts",
+                           "HasCrCard", "Balance", "NumOfProducts", "IsActiveMember",
+                           "EstimatedSalary"),
+                           funs(c(scale(.))))
+
+# View the top 10 observations
+head(scale_model, n = 10)
+```
+
+## 3.4 Split Data into Train & Validate
+
+```{r}
+# # Set 70 to 30 split for test and validate
+samples_cnt <- nrow(scale_model)
+trainset_indices <- sample(1:samples_cnt, size = round(samples_cnt * 0.7))
+
+# Split data into test
+train_set <- scale_model[trainset_indices,]
+dim(train_set)
+
+# Split data into validate
+validate_set <- scale_model[-trainset_indices,]
+dim(validate_set)
+```
+
+## 3.5 Assess if Exited is Imbalance or Not
+
+```{r}
+# View the proportion of churn vs non-churn for full dataset, train, and validate 
+table(scale_model$Exited)
+table(train_set$Exited)
+table(validate_set$Exited)
+
+
+# Create plot to showcase imbalance in train
+p7 <- ggplot(data = train_set,
+       aes(fill = Exited)) +
+       geom_bar(aes(x = Exited)) +
+       ggtitle("Number of Samples in Train Data")
+
+
+# Create plot to showcase imbalance in validate
+p8 <- ggplot(data = validate_set,
+       aes(fill = Exited)) +
+       geom_bar(aes(x = Exited)) +
+       ggtitle("Number of Samples in Validate Data")
+grid.arrange(p7, p8, ncol = 2)
+```
+
+**Summary:**
+
+-   we can see that in the data sets, the proportion of Churn vs Non-Churn are extremely unbalanced
+-   I will solve this unbalanced data set problem using random-over-sampling-examples to re-sample the data sets
+
+# 4. Model Building
+
+## 4.1 Model 1 - Logistic Regression with All Explanatory Variables
+
+```{r}
+# Create a logistic regression with all explanatory variables and Exited as the response variable
+# Fit the logistic regression model on train set only
+log_reg <- glm(Exited ~., family = binomial(link='logit'), data = train_set)
+summary(log_reg)
+
+
+# Predict the logistic model on validate data set 
+log_reg_pred <- predict(log_reg, newdata = validate_set, type ='response')
+
+# Find optimal cutoff probability to use to maximize accuracy
+optimal_cutoff <- optimalCutoff(validate_set$Exited, log_reg_pred)
+
+# Use the calculated optimal cutoff as the cutoff that will use to create the confusion matrix table
+pred_churn <- factor(ifelse(log_reg_pred >= optimal_cutoff, "Positive","Negative"))
+actual_churn <- factor(ifelse(validate_set$Exited==1,"Positive","Negative"))
+
+
+# Create a table of the confusion matrix
+table(actual_churn,pred_churn)
+
+
+# Create a confusion matrix plot 
+# Convert the confusion matrix table to dataframe
+confusion_matrix <- as.data.frame(table(actual_churn,pred_churn))
+
+
+ggplot(data = confusion_matrix, 
+       mapping = aes(x = actual_churn,
+                     y = pred_churn)) +
+  geom_tile(aes(fill = Freq)) +
+  geom_text(aes(label = sprintf("%1.0f", Freq)), vjust = 1) +
+  scale_fill_gradient(low = "green",
+                      high = "red",
+                      trans = "log") +
+  theme(legend.position="none")
+
+# Calculate a various of metrics to measure Model 1
+cm <- table(actual_churn,pred_churn)
+
+accuracy <- sum(cm[1], cm[4]) / sum(cm[1:4])
+precision <- cm[4] / sum(cm[4], cm[2])
+sensitivity <- cm[4] / sum(cm[4], cm[3])
+fscore <- (2 * (sensitivity * precision))/(sensitivity + precision)
+specificity <- cm[1] / sum(cm[1], cm[2])
+
+metrics <- tibble(accuracy, precision, sensitivity, specificity, fscore)
+metrics
+
+# Create a ROC curve to assess the cutoff point 
+log_AUC <- colAUC(log_reg_pred, validate_set$Exited, plotROC = T)
+abline(h=log_AUC, col = "Red")
+text(.2,.9, cex=.8, labels = paste("Best Cutoff: ", round(log_AUC, 2)))
+
+# Calculate the odds ratio or what are the odds of an event happening 
+# Bind the odds ratios & CI at 97.5%
+exp(cbind(OR=coef(log_reg), confint(log_reg)))
+```
+
+**Summary**:
+
+-   based on the summary output provided by the logistic regression, the most significant predictors are: **GenderMale**, **GeographyGerman**, **Age**, **Balance**, and **IsActiveMember**, which are the strongest predictors to predict the churn for this dataset
+
+-   optimal cutoff suggested using optimalCutoff() function is **0.54** which is very close to the community size of p-value = 0.50
+
+-   based on the confusion matrix, we can see that:
+
+    -   TP is **116**, TN is **2343**, FP is **57**, and FN is **484**
+
+-   metrics calculated on the confusion matrix indicated the logistic regression model is:
+
+    -   **81.9% accurate** at predicting customers churning
+
+    -   only **19.3% of precision** chance, which means this model is not that reliable
+
+    -   sensitivity at **67.05%** vs sensitivity at a rate of \*82.87\*\*
+
+    -   F-Score is **very low** in here, as the perfect F-measure is 1.0
+
+-   the ROC curve for the churn prediction is **0.77** which indicate it is moderately good at predicting churn or not churn
+
+-   from the odds table, we can see that under the 97.5% CI(which is a range of values that's likely to include a population value w/ a certain degree of confidence), we can see that for every unit increase in CreditScore, the odds of being exited increase by a factor of **0.9841632** under the 97.5% CI, and so forth
+
+## 4.2 Model 2 - StepWise Logistic Regression
+
+```{r}
+# Create a stepwise logistic regression to find the top 6 predictor variables  
+stepwise_var <- regsubsets(Exited~., data = train_set, nvmax = 6, nbest = 1, method = "seqrep")
+# Create a plot to showcase the top 6 predictors based on the Adj. R^2
+plot(stepwise_var, scale = "adjr2", main = "Adjusted R^2")
+summary(stepwise_var)
+
+# Create a logistic regression based on the top 6 predictors chosen by using stepwise method 
+stepwise_log_reg <- glm(Exited ~ Germany + Male + Age + Balance + NumOfProducts +  IsActiveMember, family = binomial(link = "logit"), data = train_set)
+summary(stepwise_log_reg)
+
+# Create a chi-square model for log_reg 
+# anova(stepwise_log_reg, test="Chisq")
+
+# Predict the logistic model on validate data set 
+sw_log_pred <- predict(stepwise_log_reg, newdata = validate_set, type ='response')
+
+# Find optimal cutoff probability to use to maximize accuracy
+optimal_cutoff <- optimalCutoff(validate_set$Exited, sw_log_pred)
+optimal_cutoff
+
+# Use the calculated optimal cutoff as the cutoff that will use to create the confusion matrix table
+pred_churn <- factor(ifelse(sw_log_pred >= optimal_cutoff, "Positive","Negative"))
+actual_churn <- factor(ifelse(validate_set$Exited==1,"Positive","Negative"))
+# Create a table of the confusion matrix
+table(actual_churn,pred_churn)
+
+# Create a confusion matrix plot 
+# Convert the confusion matrix table to dataframe
+confusion_matrix <- as.data.frame(table(actual_churn,pred_churn))
+
+ggplot(data = confusion_matrix, 
+       mapping = aes(x = actual_churn,
+                     y = pred_churn)) +
+  geom_tile(aes(fill = Freq)) +
+  geom_text(aes(label = sprintf("%1.0f", Freq)), vjust = 1) +
+  scale_fill_gradient(low = "green",
+                      high = "red",
+                      trans = "log") +
+  theme(legend.position="none")
+
+# Calculate a various of metrics to measure Model 1
+cm <- table(actual_churn, pred_churn)
+
+accuracy <- sum(cm[1], cm[4]) / sum(cm[1:4])
+precision <- cm[4] / sum(cm[4], cm[2])
+sensitivity <- cm[4] / sum(cm[4], cm[3])
+fscore <- (2 * (sensitivity * precision))/(sensitivity + precision)
+specificity <- cm[1] / sum(cm[1], cm[2])
+
+metrics <- tibble(accuracy, precision, sensitivity, specificity, fscore)
+metrics
+
+# Create a ROC curve to assess the cutoff point 
+log_AUC <- colAUC(sw_log_pred, validate_set$Exited, plotROC = T)
+abline(h=log_AUC, col = "Red")
+text(.2,.9, cex=.8, labels = paste("Best Cutoff: ", round(log_AUC, 2)))
+```
+
+**Summary:**
+
+-   using the stepwise selection method to select the top 6 predictors based on the highest R\^2, we have **Germany, CreditScore, Male, Age, Balance, and IsActiveMember** which are the same as the model output produced in Model 1 - logistic regression 
+
+-   so I used only these 6 predictors to re-build a logistic regression and created a confusion matrix 
+
+-   this time, the TP is **132**, TN is **2333**, FP is **67**, and FN is **484**
+
+    -   FP is 10 higher than in Model 1 - logistic regression using all predictors 
+
+-   Compared to previous models: 
+
+    -   Accuracy rate slightly increases a little bit, from **81.9% to 82.1%** 
+
+    -   Precision rate increases slightly a little bit, from **19% to 22%**
+
+    -   Sensitivity drops a little bit, from **67% to 66%**
+
+    -   Specificity increases a little bit, from **82.8% to 83.2%**
+
+    -   F-1 measureincreases a little bit, from **0.3 to 0.33**
+
+-   **ROC curve is still 0.77**
+
+## 4.3 Model 3 - ROSE Logistic Regression
+
+```{r}
+# Resampled the data using ROSE
+rose_train <- ROSE(Exited ~., data = train_set)$data
+table(rose_train$Exited)
+
+# Create a logistic regression based on the ROSE resampled data 
+rose_log_reg <- glm(Exited ~ Germany + Male + Age + Balance + NumOfProducts +  IsActiveMember, family = binomial(link = "logit"), data = rose_train)
+summary(rose_log_reg)
+
+# Create a chi-square model for log_reg 
+anova(rose_log_reg, test="Chisq")
+
+# Predict the logistic model on validate data set 
+rose_pred <- predict(rose_log_reg, newdata = validate_set, type ='response')
+
+# Find optimal cutoff probability to use to maximize accuracy
+optimal_cutoff <- optimalCutoff(validate_set$Exited, rose_pred)
+
+# Use the calculated optimal cutoff as the cutoff that will use to create the confusion matrix table
+pred_churn <- factor(ifelse(rose_pred >= optimal_cutoff, "Positive","Negative"))
+actual_churn <- factor(ifelse(validate_set$Exited==1,"Positive","Negative"))
+# Create a table of the confusion matrix
+table(actual_churn, pred_churn)
+
+# Create a confusion matrix plot 
+# Convert the confusion matrix table to dataframe
+confusion_matrix <- as.data.frame(table(actual_churn,pred_churn))
+
+ggplot(data = confusion_matrix, 
+       mapping = aes(x = actual_churn,
+                     y = pred_churn)) +
+  geom_tile(aes(fill = Freq)) +
+  geom_text(aes(label = sprintf("%1.0f", Freq)), vjust = 1) +
+  scale_fill_gradient(low = "green",
+                      high = "red",
+                      trans = "log") +
+  theme(legend.position="none")
+
+# Calculate a various of metrics to measure Model 3
+cm <- table(actual_churn, pred_churn)
+
+accuracy <- sum(cm[1], cm[4]) / sum(cm[1:4])
+precision <- cm[4] / sum(cm[4], cm[2])
+sensitivity <- cm[4] / sum(cm[4], cm[3])
+fscore <- (2 * (sensitivity * precision))/(sensitivity + precision)
+specificity <- cm[1] / sum(cm[1], cm[2])
+
+metrics <- tibble(accuracy, precision, sensitivity, specificity, fscore)
+metrics
+
+# Create a ROC curve to assess the cutoff point 
+log_AUC <- colAUC(rose_pred, validate_set$Exited, plotROC = T)
+abline(h=log_AUC, col = "Red")
+text(.2,.9, cex=.8, labels = paste("Best Cutoff: ", round(log_AUC, 2)))
+```
+
+**Summary:**
+
+-   since our data is extremely imbalanced, I used the Random-Over-Sampling examples method which is enhanced version of down-sampling & over-sampling methods to resample the train dataset and build a 3rd logistic regression model with the top 6 chosen predictors 
+
+-   based on the confusion matrix: 
+
+    -   this time, the TP is **145**, TN is **2295**, FP is **105**, and FN is **455**
+
+    -   FP is a lot higher than the previous two models
+
+-   Compared to previous models: 
+
+    -   Accuracy rate is **slightly lower** than the previous two models 
+
+    -   Precision rate increases slightly a little bit, from **19% to 22% to 24.16%**
+
+    -   Sensitivity drops a little bit, from **67% to 66% to 58%**
+
+    -   Specificity increases a little bit, from **82.8% to 83.2% to 83.45%**
+
+    -   F-1 measureincreases a little bit, from **0.3 to 0.33 to 0.34**
+
+-   **ROC curve is still 0.77**
+
+## 4.4 Model 4 - Decision Tree
+
+```{r}
+# Create a full tree using the resampled data & only the top 6 most significant predictors 
+full_decision_mod <- rpart(Exited ~ Germany + Male + Age + Balance + NumOfProducts +  IsActiveMember, data = rose_train, method = "class", cp=0.001)
+
+# Plot the trees
+par(xpd = NA) # Avoid clipping the text in some device
+plot(full_decision_mod)
+text(full_decision_mod, digits = 3)
+
+# Predict the full decision tree on validate data set 
+full_decision_pred <- predict(full_decision_mod, newdata = validate_set, type = "class") 
+
+# Create a confusion matrix on the full decision tree
+cm_full_tree <- caret::confusionMatrix(full_decision_pred, validate_set$Exited, positive = "1", mode = "everything")
+cm_full_tree$table
+
+# Calculate a various of metrics to measure Model 4
+classification_metrics <- function(confusion_matrix) { 
+  metrics <- data.frame(matrix(0, nrow=1, ncol=5))
+
+  metrics[1:4]<-confusion_matrix$byClass[c(2,6,5,7)]
+  metrics[5]<-confusion_matrix$overall[1]
+  names(metrics)<-c("accuracy", "precision", "sensitivity", "fscore", "specificity")
+  
+  return(metrics)
+}
+
+full_decision_metrics <- classification_metrics(cm_full_tree)
+full_decision_metrics
+```
+
+**Summary:**
+
+-   for the decision tree model, I used the new train after that it has been re-sampled using ROSE and also the top 6 predictors 
+
+-   based on the confusion matrix: 
+
+    -   this time, the TP is **422**, TN is **2055**, FP is **345**, and FN is **178,** which **FP is higher than previous models**
+
+-   Compared to Model 1: 
+
+    -   Accuracy rate is **significantly increased** than the previous 3 models 
+
+    -   Precision rate also **significantly** **increases 19% to 70.33%**
+
+    -   Sensitivity drops a little bit, from **67% to 55%**
+
+    -   Specificity decreases a little bit, from **83.45%** shown in model 3 to **82.5%**
+
+    -   F-1 measure **significantly increases** from **0.3 to 0.6**
+
+### 4.4.1 Prune Full Decision Tree
+
+```{r}
+# Create a plot to determine how many leaves to prune the full tree at 
+options(repr.plot.width = 16, repr.plot.height = 8)
+plotcp(full_decision_mod)
+
+# Prune the full decision tree at 21 leaves and cp of 0.0048
+# tree pruning
+prune_tree <- prune(full_decision_mod, cp=0.0048)
+
+# Predict the prune tree on validate data set 
+prune_tree_pred <- predict(prune_tree, newdata = validate_set, type = "class") 
+
+# Create a confusion matrix on the pruned decision tree
+cm_pruned_tree <- caret::confusionMatrix(prune_tree_pred, validate_set$Exited, positive = "1", mode = "everything")
+cm_pruned_tree$table
+
+# get classification metrics
+pruned_tree_metrics <- classification_metrics(cm_pruned_tree)
+pruned_tree_metrics
+```
+
+**Summary:**
+
+-   I first plot out the full decision tree and then decided to prune the tree at 21 leaves and a cp of 0.0048 
+
+-   based on the confusion matrix: 
+
+    -   this time, the TP is **381**, TN is **2016**, FP is **384**, and FN is **219,** which **both FP and FN are higher than previous models**
+
+-   Compared to previous models: 
+
+    -   both Accuracy & Precision rates are **slightly lower** than the full decision tree but still **higher** than Model #1-#3
+
+    -   Sensitivity drops by a lot, from **67% in Model 1 to 49.80%**
+
+    -   Specificity decreases from **83.45%** shown in model 3 to **79.9%%**
+
+    -   F-1 measure **significantly decrease from 0.6 in the full decision tree to 0.55**
+
+## 4.5 Model 5 - Random Forest
+
+```{r}
+# Build the random forest model
+rf_model <- randomForest(Exited ~ Germany + Male + Age + Balance + NumOfProducts +  IsActiveMember, data = rose_train)
+print(rf_model)
+
+# Create a plot to showcase the top 6 most sigificant predictors for random forest 
+vip(rf_model, scale = T) +
+  labs(y = "Relative importance",
+       title = "Relative importance of predictors in Random Forest model")+
+  theme_minimal()
+
+# Predict the random forest on validate data set 
+rf_pred <- predict(rf_model, validate_set)
+
+# Create a confusion matrix on the actual vs predicted
+cm <- table(rf_pred, validate_set$Exited)
+
+# Calculate a various of metrics to measure Model 5
+accuracy <- sum(cm[1], cm[4]) / sum(cm[1:4])
+precision <- cm[4] / sum(cm[4], cm[2])
+sensitivity <- cm[4] / sum(cm[4], cm[3])
+fscore <- (2 * (sensitivity * precision))/(sensitivity + precision)
+specificity <- cm[1] / sum(cm[1], cm[2])
+
+metrics <- tibble(accuracy, precision, sensitivity, specificity, fscore)
+metrics
+```
+
+**Summary:**
+
+-   the top 6 predictors that random forest selected are the same as the previous models we have seen so far
+
+-   based on the confusion matrix: 
+
+    -   this time, the TP is **2562**, TN is **2656**, FP is **937**, and FN is **845,** which **both FP and FN are extremely higher than the previous models**
+
+-   Compared to the previous models: 
+
+    -   Accuracy rate is **lower than the decision tree** 
+
+    -   Precision rate is significantly **lower** than the full decision tree 
+
+    -   Sensitivity decreases only a little bit, from **67% in Model 1 to 65.5%**
+
+    -   Specificity is so far the highest among the other 4 models, at 88.41% 
+
+    -   F-1 measure increases by a little bit from **0.6 in Model 4 to 0.61**
+
+## 4.6 Model 6 - Support Vector Machine
+
+```{r}
+# Build a SVM 
+svm_model <- caret::train(Exited ~ ., 
+                 data=rose_train, 
+                method='svmRadial',
+                trControl=trainControl(method="cv", 
+                                       number=2, 
+                                       allowParallel=TRUE, 
+                                       verboseIter=TRUE))
+
+# Predict the SVM on validate data set 
+svm_pred <- predict(svm_model, validate_set)
+
+# Create a confusion matrix on the actual vs predicted
+cm <- table(svm_pred, validate_set$Exited)
+
+# Calculate a various of metrics to measure Model 6
+accuracy <- sum(cm[1], cm[4]) / sum(cm[1:4])
+precision <- cm[4] / sum(cm[4], cm[2])
+sensitivity <- cm[4] / sum(cm[4], cm[3])
+fscore <- (2 * (sensitivity * precision))/(sensitivity + precision)
+specificity <- cm[1] / sum(cm[1], cm[2])
+
+metrics <- tibble(accuracy, precision, sensitivity, specificity, fscore)
+metrics
+```
+
+**Summary:**
+
+-   Compared to the previous models: 
+
+    -   Accuracy rate is the **lowest among the other 5 models**
+
+    -   Precision rate is significantly **lower** than the full decision tree 
+
+    -   Sensitivity is the same rate as Model 5 - Random Forest
+
+    -   Specificity is pretty high at  **82.79%**
+
+    -   F-1 measure decreases from **0.61 in Model 4 to 0.55**
+
+# 5. Final Model
+
+```{r}
+# Select full decision tree based on having the highest accuracy 
+final_model <- full_decision_mod
+```
+
+**Conclusion:**
+
+-   Selected Model #4 - Full Decision Tree as the final model because it has the highest accuracy rate.
