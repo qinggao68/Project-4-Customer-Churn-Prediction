@@ -48,6 +48,7 @@ I also plan to hyperparameter tuning the models I built to improve the accuracy 
 
 # Reference
 [TrustTheData's Kaggle Notebook done using Python] https://www.kaggle.com/code/kmalit/bank-customer-churn-prediction
-[Atindra Bandi's Kaggle Notebook done using R on a different data set] 
-https://www.kaggle.com/code/janiobachmann/anticipating-attrition-automl-to-the-rescue/report 
+
+[Atindra Bandi's Kaggle Notebook done using R on a different data set] https://www.kaggle.com/code/janiobachmann/anticipating-attrition-automl-to-the-rescue/report 
+
 [stackoverflow's code on drawing correlation matrix]  https://stackoverflow.com/questions/37897252/plot-confusion-matrix-in-r-using-ggplot
