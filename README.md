@@ -44,7 +44,7 @@ Some brief background of each machine learning model and definitions of the clas
 # Future Work 
 I am currently working on the app, which will be uploaded to the Shiny server, and it will contain data visualization and prediction of a customer's churn rate. 
 
-I also plan to hyperparameter tuning the models I built to improve the accuracy rate. 
+I also plan to hyperparameter tuning the models I built to improve the accuracy rate. And, perhaps build couple more models using different feature selection and resampling methods other than StepWise and ROSE. 
 
 # Reference
 [TrustTheData's Kaggle Notebook done using Python] https://www.kaggle.com/code/kmalit/bank-customer-churn-prediction
