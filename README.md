@@ -13,7 +13,7 @@ This analysis is studied upon a bank data set provided on the UCI datasets repos
 ![predictors selected by rf](https://github.com/qinggao68/Project-4-Customer-Churn-Prediction/blob/main/important_predictors_selected_rf.PNG)
 
 # Additional Information 
-Some brief background of each machine learning model and definitions of the classification metrics that are used in this analysis: 
+Some brief background of the machine learning models that are used in this analysis: 
 
 **Machine Learning Models:** 
 1. Logistic Regression Model: used to model the probability of a certain class or event happening(e.g. probability of a customer churning)
