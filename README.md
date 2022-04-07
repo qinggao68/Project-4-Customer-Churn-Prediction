@@ -4,7 +4,7 @@ Since acquiring a new customer is 5x to 25x more expensive than retaining an exi
 # Key Findings
 This analysis is studied upon a bank data set provided on the UCI datasets repository. Some of the key findings I found: 
 
-- most common characteristics of customers that have already churned have: Fair FICO Score(6.9%), female(11.39%), highest income bracket($149k-$200k), older adults who are age 44-92(10.44%), been customer for less than 36 months(7.41%), Germany(8.14%), only have 1 product, not active member(13.02%), and has credit card(14.24%)
+- most common characteristics of customers that have already churned have: Fair FICO Score(6.9%), female(11.39%), highest income bracket($149k-$200k), older adults who are age 44-92(10.44%), been customer for less than 36 months(7.41%), Germany(8.14%), only have 1 product, not active member(13.02%), and have credit card(14.24%)
 - based on the correlation matrix, we can see that predictors Age & Balance are mostly correlated with response variable - Exited, EstimatedSalary has almost no correlation, and CreditScore, Tenure, NumOfProducts, HasCrCard, and IsActiveMember moved in the opposite direction
 ![correlation matrix](https://github.com/qinggao68/Project-4-Customer-Churn-Prediction/blob/main/correlation_matrix.PNG)
 - the top predictors that are most statistically signicant considered by all 6 models are: Germany, Male, Age, Balance, IsActiveMember, CreditScore, and NumOfProducts
